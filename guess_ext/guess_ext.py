@@ -72,6 +72,6 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
 
 
 # 테스팅 코드
-fd = "C:/Users/clost/Downloads/PALOMA.pdf"
+fd = "파일경로"
 flist = guess_ext(fd)
 print(flist)
