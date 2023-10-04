@@ -4,7 +4,6 @@ import os
 
 def guess_ext(filename)->list[str]: # filename:str - 파일 경로
     enable_list = []
-    filelen_byte = os.path.getsize(filename)
     
     # 파일 시그니처와 해당 확장자 매핑
     header_signatures = {
@@ -46,32 +45,39 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
     footer_signature = {
         # 다른 파일 형식의 시그니처를 여기에 추가할 수 있습니다.
     }
-    
-    f = open(filename, "rb")
 
-    # 파일 초반 1~30바이트를 읽어들여 파일 헤더 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 
-    for i in range(1, 30):
-        file_signature = f.read(i)
-        print(file_signature)
-        enable_value = header_signatures.get(file_signature)
-        if enable_value:
-            enable_list.append(enable_value)
-        f.seek(0)
-    # 파일 후반 1~30바이트를 읽어들여 파일 푸터 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 (작성 필요)
-    for i in range(1, 30):
-        f.seek(filelen_byte - i)
-        file_signature = f.read(i)
-        print(file_signature)
-        enable_value = footer_signature.get(file_signature)
-        if enable_value:
-            enable_list.append(enable_value)
-        f.seek(0)
-    f.close()
+    try:
+        f = open(filename, "rb")
+        filelen_byte = os.path.getsize(filename)
+
+        # 파일 초반 1~30바이트를 읽어들여 파일 헤더 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 
+        for i in range(1, 30):
+            file_signature = f.read(i)
+            enable_value = header_signatures.get(file_signature)
+            if enable_value:
+                enable_list.append(enable_value)
+            f.seek(0)
+        # 파일 후반 1~30바이트를 읽어들여 파일 푸터 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 (작성 필요)
+        for i in range(1, 30):
+            f.seek(filelen_byte - i)
+            file_signature = f.read(i)
+            enable_value = footer_signature.get(file_signature)
+            if enable_value:
+                enable_list.append(enable_value)
+            f.seek(0)
+        f.close()
+    # '분석 날짜, 핀 지정' 폴더 내부 함수 코드 참조
+    except FileNotFoundError: 
+        print(f'Error: {filename}을(를) 찾을 수 없습니다.')
+    except Exception as e:
+        print(f'Error: {e}')
     
     return enable_list # list[str] - 가능한 확장자명을 리스트에 담아 출력
 
 
 # 테스팅 코드
-fd = "파일경로"
+fd = "파일 경로"
 flist = guess_ext(fd)
 print(flist)
+
+
