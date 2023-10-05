@@ -57,7 +57,7 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
             if enable_value:
                 enable_list.append(enable_value)
             f.seek(0)
-        # 파일 후반 1~30바이트를 읽어들여 파일 푸터 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 (작성 필요)
+        # 파일 후반 1~30바이트를 읽어들여 파일 푸터 시그니처 목록에 매핑하여 가능한 파일 확장자 분류
         for i in range(1, 30):
             f.seek(filelen_byte - i)
             file_signature = f.read(i)
