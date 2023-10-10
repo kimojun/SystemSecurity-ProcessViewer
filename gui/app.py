@@ -1,18 +1,33 @@
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeView, QFileSystemModel, QAction, QToolBar, \
-    QLineEdit, QWidget, QVBoxLayout, QMenu, QDialog, QLabel, QPushButton, QDateEdit, QFileDialog , QInputDialog
-from PyQt5.QtCore import QDir, Qt, QDate
-from PyQt5.QtGui import QDesktopServices
+    QLineEdit, QWidget, QVBoxLayout, QMenu, QDialog, QLabel, QTextEdit, QSplitter
+from PyQt5.QtCore import QDir, Qt
 import sys
 
-class FileExplorer(QMainWindow):
-    def __init__(self):
+class InfoDialog(QDialog):
+    def __init__(self, file_info):
         super().__init__()
+        self.setWindowTitle(f"Info for {file_info.fileName()}")
+        layout = QVBoxLayout()
+        label = QLabel(f"Full Path: {file_info.absoluteFilePath()}\nSize: {file_info.size()} bytes")
+        layout.addWidget(label)
+        self.setLayout(layout)
+
+class FileExplorer(QMainWindow):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dialogs = []  # 생성된 QDialog 객체들을 저장하기 위한 리스트
         self.ctrl_pressed = False  # 컨트롤 키가 눌려 있는지 확인
+        self.back_history = []  # 뒤로 가기를 위한 히스토리
+        self.forward_history = []  # 앞으로 가기를 위한 히스토리
         self.initUI()
 
     def initUI(self):
         self.setGeometry(100, 100, 800, 600)
         self.setWindowTitle("File Explorer")
+
+        # QSplitter를 사용하여 수평 레이아웃 생성
+        splitter = QSplitter(Qt.Horizontal)
 
         # 파일 시스템 모델 생성
         self.model = QFileSystemModel()
@@ -24,15 +39,27 @@ class FileExplorer(QMainWindow):
         self.tree_view.setRootIndex(self.model.index(QDir.rootPath()))
         self.tree_view.setColumnWidth(0, 250)
         self.tree_view.setSelectionMode(QTreeView.ExtendedSelection)  # ExtendedSelection 모드로 설정
+        self.tree_view.doubleClicked.connect(self.navigateToClickedPath)  # 클릭 이벤트를 새 메서드에 연결
 
-        # 검색 위젯 생성
-        self.search_input = QLineEdit(self)
-        self.search_input.setPlaceholderText("검색 파일 또는 디렉터리")
-        self.search_input.textChanged.connect(self.searchFiles)
+        # 터미널 창 생성
+        self.terminal_output = QTextEdit(self)
+        self.terminal_output.setReadOnly(True)  # 읽기 전용 모드로 설정
+        self.terminal_output.setMinimumHeight(100)  # 터미널 창의 최소 높이 설정
 
-        # 툴바 생성 전에 경로 입력 위젯 초기화
-        self.path_input = QLineEdit(self)
-        self.path_input.returnPressed.connect(self.navigateToPath)  # 엔터 키 이벤트 연결
+        # QSplitter에 위젯 추가
+        splitter.addWidget(self.tree_view)
+        splitter.addWidget(self.terminal_output)
+
+        # 수평 레이아웃에서 비율을 4:3으로 설정
+        sizes = [4, 3]
+        splitter.setSizes(sizes)
+
+        # 중앙 위젯 설정
+        central_widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(splitter)  # QSplitter를 중앙 위젯에 추가
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
 
         # 툴바 생성
         toolbar = QToolBar()
@@ -44,50 +71,68 @@ class FileExplorer(QMainWindow):
         self.forward_action.triggered.connect(self.goForward)
         toolbar.addAction(self.forward_action)
 
-
-        self.context_menu = QMenu(self)
-        self.view_details_action = QAction("상세 정보 보기", self)
-        self.view_details_action.triggered.connect(self.showDetails)
-        self.context_menu.addAction(self.view_details_action)
-
-        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tree_view.customContextMenuRequested.connect(self.showContextMenu)
-        self.tree_view.clicked.connect(lambda index: self.updateStatusbar(index))
-
-        # 중앙 위젯 설정
-        central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
-        layout.addWidget(self.search_input)
-        layout.addWidget(self.tree_view)
-        self.setCentralWidget(central_widget)
-
         # 현재 경로 표시 및 수정
         self.path_input = QLineEdit(self)
         self.path_input.returnPressed.connect(self.navigateToPath)  # 엔터 키 이벤트 연결
         toolbar.addWidget(self.path_input)  # 입력란을 툴바에 추가
+        self.back_history.append(self.model.index(QDir.rootPath()))
+
+        # Clicked 추가
+        self.tree_view.clicked.connect(self.handleTreeViewClick)
+
+    def handleTreeViewClick(self, index):
+        self.updateStatusbar(index)
+        self.updateHistoryOnClick(index)
+
+    def updateHistoryOnClick(self, index):
+        current_index = self.tree_view.rootIndex()
+        if current_index != index.parent():
+            self.back_history.append(current_index)
+            self.forward_history.clear()
+            self.updateButtonState()
 
     def navigateToPath(self):
+        current_index = self.tree_view.rootIndex()
         path = self.path_input.text()
         index = self.model.index(path)
         if index.isValid():
+            if current_index != index:
+                self.back_history.append(current_index)
+                self.forward_history.clear()
             self.tree_view.setRootIndex(index)
             self.updateStatusbar(index)
-        else:
-            # 유효하지 않은 경로에 대한 오류 처리
-            pass
+            self.updateButtonState()
 
+    def navigateToClickedPath(self, index):
+        if index.isValid() and self.model.isDir(index):
+            current_index = self.tree_view.rootIndex()
+            if current_index != index:
+                if not self.back_history or self.back_history[-1] != current_index:
+                    self.back_history.append(current_index)
+                self.forward_history.clear()
+                self.tree_view.setRootIndex(index)
+                self.updateStatusbar(index)
+                self.updateButtonState()
+
+    def updateNavigationButtons(self):
+        self.back_action.setEnabled(bool(self.back_history))
+        self.forward_action.setEnabled(bool(self.forward_history))
 
     def goBack(self):
         if self.back_history:
-            self.forward_history.append(self.tree_view.rootIndex())
+            current_index = self.tree_view.rootIndex()
+            self.forward_history.append(current_index)
             self.tree_view.setRootIndex(self.back_history.pop())
             self.updateStatusbar(self.tree_view.rootIndex())
+            self.updateButtonState()
 
     def goForward(self):
         if self.forward_history:
-            self.back_history.append(self.tree_view.rootIndex())
+            current_index = self.tree_view.rootIndex()
+            self.back_history.append(current_index)
             self.tree_view.setRootIndex(self.forward_history.pop())
             self.updateStatusbar(self.tree_view.rootIndex())
+            self.updateButtonState()
 
     def searchFiles(self):
         query = self.search_input.text()
@@ -123,51 +168,61 @@ class FileExplorer(QMainWindow):
             self.context_menu.exec_(self.tree_view.mapToGlobal(pos))
 
     def showDetails(self):
-        # 상세 정보 창 표시 메서드
-        index = self.tree_view.currentIndex()
-        if index.isValid():
-            file_info = self.model.fileInfo(index)
-            if file_info.exists():
+        all_selected_indexes = self.tree_view.selectionModel().selectedIndexes()
+        selected_indexes = [index for index in all_selected_indexes if index.column() == 0]
+
+        if len(selected_indexes) > 1:
+            for index in selected_indexes:
+                file_info = self.model.fileInfo(index)
                 details_dialog = QDialog(self)
                 layout = QVBoxLayout(details_dialog)
-                file_name_label = QLabel(f"파일 이름: {file_info.fileName()}", details_dialog)
-                layout.addWidget(file_name_label)
-                file_size_label = QLabel(f"파일 크기: {file_info.size()} 바이트", details_dialog)
-                layout.addWidget(file_size_label)
-                file_path_label = QLabel(f"파일 경로: {file_info.filePath()}", details_dialog)
-                layout.addWidget(file_path_label)
-                last_modified_label = QLabel(f"마지막 변경날짜: {file_info.lastModified().toString()}", details_dialog)
-                layout.addWidget(last_modified_label)
-                last_accessed_label = QLabel(f"마지막 접근날짜: {file_info.lastRead().toString()}", details_dialog)
-                layout.addWidget(last_accessed_label)
-                created_label = QLabel(f"생성 날짜: {file_info.birthTime().toString()}", details_dialog)
-                layout.addWidget(created_label)
+                self.addFileInfoToLayout(file_info, layout)
+
+                details_dialog.setWindowTitle(file_info.fileName())
+                details_dialog.setLayout(layout)
+                details_dialog.show()
+
+                self.dialogs.append(details_dialog)
+
+            self.dialogs = [dialog for dialog in self.dialogs if dialog.isVisible()]
+
+        else:
+            index = self.tree_view.currentIndex()
+            if index.isValid():
+                file_info = self.model.fileInfo(index)
+
+                details_dialog = QDialog(self)
+                layout = QVBoxLayout(details_dialog)
+                self.addFileInfoToLayout(file_info, layout)
+
+                details_dialog.setWindowTitle(file_info.fileName())
+                details_dialog.setLayout(layout)
                 details_dialog.exec_()
+
+    def addFileInfoToLayout(self, file_info, layout):
+        file_name_label = QLabel(f"파일 이름: {file_info.fileName()}")
+        layout.addWidget(file_name_label)
+        file_size_label = QLabel(f"파일 크기: {file_info.size()} 바이트")
+        layout.addWidget(file_size_label)
+        file_path_label = QLabel(f"파일 경로: {file_info.filePath()}")
+        layout.addWidget(file_path_label)
+        last_modified_label = QLabel(f"마지막 변경날짜: {file_info.lastModified().toString()}")
+        layout.addWidget(last_modified_label)
+        last_accessed_label = QLabel(f"마지막 접근날짜: {file_info.lastRead().toString()}")
+        layout.addWidget(last_accessed_label)
+        created_label = QLabel(f"생성 날짜: {file_info.birthTime().toString()}")
+        layout.addWidget(created_label)
 
     def updateStatusbar(self, index):
         current_path = self.model.filePath(index)
-        self.path_input.setText(current_path)  # 경로를 QLineEdit 위젯에 설정
+        self.path_input.setText(current_path)
 
-    '''
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Control:
-            self.ctrl_pressed = True
-            self.tree_view.setSelectionMode(QTreeView.MultiSelection)
-        super().keyPressEvent(event)
-
-    def keyReleaseEvent(self, event):
-        if event.key() == Qt.Key_Control:
-            self.ctrl_pressed = False
-            self.tree_view.setSelectionMode(QTreeView.SingleSelection)
-        super().keyReleaseEvent(event)
-    '''
+    def updateButtonState(self):
+        self.back_action.setEnabled(bool(self.back_history))
+        self.forward_action.setEnabled(bool(self.forward_history))
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = FileExplorer()
     ex.show()
     sys.exit(app.exec_())
-
-
-
-
