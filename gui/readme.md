@@ -4,6 +4,18 @@
 
 *확정된 사안이 아니며 구현 어려움이나 이후 프로젝트 진행 사항에 따라 바뀔수 있음*
 
+## 요구사항
+
+- FileExplorer 클래스의 생성자에 front_api 인자를 받음
+
+## FrontAPI
+
+`check_unmatched_ext(fileinfo:dict)`
+
+`ㅁ`
+
+``
+
 ## 필요한 기능
 
 - 현재 경로를 표시하는 입력가능한 창

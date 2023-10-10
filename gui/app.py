@@ -5,7 +5,6 @@ from PyQt5.QtGui import QDesktopServices
 import sys
 
 class FileExplorer(QMainWindow):
-
     def __init__(self):
         super().__init__()
         self.ctrl_pressed = False  # 컨트롤 키가 눌려 있는지 확인
