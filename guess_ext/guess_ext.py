@@ -8,8 +8,9 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
     # 파일 시그니처와 해당 확장자 매핑
     # 리스트를 리턴하는 방식으로 구현하여 시그니처가 동일한 다른 확장자에 대한 목록을 리턴
     header_signatures = {
-        b'\xFF\xD8\xFF': ['jpg'],
+        b'\xFF\xD8\xFF': ['jpg/jpeg'],
         b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A': ['png'],
+        b'\x47\x49\x46\x38\x37\x61': ['gif'],
         b'\x47\x49\x46\x38\x39\x61': ['gif'],
         b'\x42\x4D': ['bmp'],
         b'\x49\x20\x49': ['tif'],
@@ -44,6 +45,11 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
         # 다른 파일 형식의 헤더 시그니처를 여기에 추가할 수 있습니다.
     }
     footer_signature = {
+        b'\xFF\xD9': ['jpg/jpeg'],
+        b'\x00\x3B': ['gif'],
+        b'\x49\x45\x4E\x44\xAE\x42\x60\x82': ['png'],
+        b'\x25\x25\x45\x4F\x46': ['pdf'],
+        b'\x50\x4B\x05\x06': ['zip'],
         # 다른 파일 형식의 푸터 시그니처를 여기에 추가할 수 있습니다.
     }
     
