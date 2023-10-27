@@ -52,21 +52,35 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
         b'\x50\x4B\x05\x06': ['zip'],
         # 다른 파일 형식의 푸터 시그니처를 여기에 추가할 수 있습니다.
     }
-    
-   try:
+
+    try:
+        sign_search_len = 30
+        pin = 0
         f = open(filename, "rb")
+
+        # file size
         filelen_byte = os.path.getsize(filename)
 
-        # 파일 초반 1 ~ 30 bytes를 읽어들여 파일 헤더 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 
-        for i in range(1, 30):
+        # pin과 연결되었을 경우 사용해야할 코드
+        '''
+        if has_pin(filename):
+            remove_pin(filename)
+            pin = 1
+        '''
+        
+        # file size 가 작은 경우를 고려
+        if filelen_byte < sign_search_len:
+            sign_search_len = filelen_byte
+        
+        # 파일 초반 바이트를 읽어들여 파일 헤더 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 
+        for i in range(1, sign_search_len):
             file_signature = f.read(i)
             enable_value = header_signatures.get(file_signature)
             if enable_value:
                 enable_list.extend(enable_value)
             f.seek(0)
-
-        # 파일 후반 1 ~ 30 bytes를 읽어들여 파일 푸터 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 (작성 필요)
-        for i in range(1, 30):
+        # 파일 후반 바이트를 읽어들여 파일 푸터 시그니처 목록에 매핑하여 가능한 파일 확장자 분류 (작성 필요)
+        for i in range(1, sign_search_len):
             f.seek(filelen_byte - i)
             file_signature = f.read(i)
             enable_value = footer_signature.get(file_signature)
@@ -74,6 +88,13 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
                 enable_list.extend(enable_value)
             f.seek(0)
         f.close()
+        
+        # pin과 연결되었을 경우 사용해야할 코드
+        '''
+        if pin == 1:
+            add_pin(filename)
+        '''
+
     except FileNotFoundError: 
         print(f'Error: {filename}을(를) 찾을 수 없습니다.')
     except Exception as e:
@@ -82,10 +103,7 @@ def guess_ext(filename)->list[str]: # filename:str - 파일 경로
     return enable_list # list[str] - 가능한 확장자명을 리스트에 담아 출력
 
 
-if __name__ == "__main__":
-    # 테스팅 코드
-    fd = "파일 경로"
-    flist = guess_ext(fd)
-    print(flist)
-
-
+# 테스팅 코드
+fd = "C:/Users/clost/Downloads/PALOMA.pdf"
+flist = guess_ext(fd)
+print(flist)
